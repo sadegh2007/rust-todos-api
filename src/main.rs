@@ -1,9 +1,12 @@
 use std::{sync::{Arc, Mutex}};
 use axum::Router;
+use dotenvy::dotenv;
 use todos_app::{app_state::AppState, routes::create_routes};
 
 #[tokio::main]
 async fn main() {
+    dotenv().ok();
+    
     let shared_state: Arc<AppState> = initial_state();
 
     let app_routes = Router::new()

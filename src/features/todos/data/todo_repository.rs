@@ -1,66 +1,93 @@
-use std::sync::Arc;
+use diesel::{query_dsl::methods::FilterDsl, ExpressionMethods, RunQueryDsl};
 
-use axum::extract::State;
+use crate::{establish_connection, features::todos::{domain::todo::{Todo}, dtos::{todo_dto::TodoDto, upsert_todo_request::UpsertTodoRequest}}, schema};
 
-use crate::{app_state::AppState, features::todos::{domain::todo::Todo, dtos::{todo_dto::TodoDto, upsert_todo_request::UpsertTodoRequest}}};
-
-pub struct TodoRepository {
-    state: State<Arc<AppState>>,
-}
+pub struct TodoRepository;
 
 impl TodoRepository {
-    pub fn new(State(state): State<Arc<AppState>>) -> Self {
-        TodoRepository {
-            state: State(state)
-        }
+    pub fn new() -> Self {
+        TodoRepository {}
     }
 
     pub fn get_todos(&self) -> Vec<TodoDto> {
-        let todos = self.state.todos.lock().unwrap().iter()
-        .map(|todo| TodoDto::from_todo(todo))
-        .collect::<Vec<TodoDto>>();
+        let conn = &mut establish_connection();
 
-        return todos;
+        let result = schema::todos::table
+            .load::<Todo>(conn);
+
+        if result.is_err() {
+            eprintln!("Error loading todos: {:?}", result.err());
+            return Vec::new();
+        } 
+
+        // Convert the Vec<Todo> to Vec<TodoDto>
+        return result.unwrap().into_iter()
+            .map(| todo | TodoDto::from_todo(&todo))
+            .collect();
     }
     
-    pub fn create(&self, request: &UpsertTodoRequest) -> TodoDto {
+    pub fn create(&self, request: &UpsertTodoRequest) -> Option<TodoDto> {
+        let conn = &mut establish_connection();
+
         let todo = Todo::new(request.title.to_string(), request.content.to_string());
+        
+        let result = diesel::insert_into(schema::todos::table)
+            .values(request)
+            .get_result::<Todo>(conn);
 
-        let mut todos = self.state.todos.lock().unwrap();
-        todos.push(todo.clone());
+        if result.is_err() {
+            eprintln!("Error inserting todo: {:?}", result.err());
+            return None;
+        }
 
-        return TodoDto::from_todo(&todo);
+        return Some(TodoDto::from_todo(&todo));
     }
 
     pub fn get(&self, id: uuid::Uuid) -> Option<TodoDto> {
-        let todos = self.state.todos.lock().unwrap();
+        let conn = &mut establish_connection();
 
-        return todos.iter()
-            .find(|todo| todo.id == id)
-            .map(|todo| TodoDto::from_todo(todo));
+        let result = schema::todos::table
+            .filter(schema::todos::id.eq(id))
+            .first::<Todo>(conn);
+
+        return match result {
+            Ok(todo) => Some(TodoDto::from_todo(&todo)),
+            Err(_) => None,
+        };
     }
 
     pub fn update(&self, id: uuid::Uuid, request: &UpsertTodoRequest) -> Option<TodoDto> {
-        let mut todos = self.state.todos.lock().unwrap();
+        let conn = &mut establish_connection();
 
-        if let Some(existing_todo) = todos.iter_mut().find(|todo| todo.id == id) {
-            existing_todo.title = request.title.to_string();
-            existing_todo.content = request.content.to_string();
-            existing_todo.updated_at = Some(chrono::Utc::now());
-            
-            return Some(TodoDto::from_todo(existing_todo));
+        let result = schema::todos::table
+            .filter(schema::todos::id.eq(id))
+            .first::<Todo>(conn);
+
+        if result.is_err() {
+            return None;
         }
 
-        return None;
+        let update_result = diesel::update(schema::todos::table)
+            .filter(schema::todos::id.eq(id))
+            .set(request)
+            .get_result::<Todo>(conn);
+
+        return match update_result {
+            Ok(todo) => Some(TodoDto::from_todo(&todo)),
+            Err(_) => None,
+        };
     }
 
     pub fn delete(&self, id: uuid::Uuid) -> bool {
-        let mut todos = self.state.todos.lock().unwrap();
-        let initial_len = todos.len();
+         let conn = &mut establish_connection();
 
-        todos.retain(|todo| todo.id != id);
+         let result = diesel::delete(schema::todos::table)
+            .filter(schema::todos::id.eq(id))
+            .execute(conn);
 
-        return todos.len() < initial_len;
-        
+        return match result {
+            Ok(rows_deleted) => rows_deleted > 0,
+            Err(_) => false,
+        };
     }
 }

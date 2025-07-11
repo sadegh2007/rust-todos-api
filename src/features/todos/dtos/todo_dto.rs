@@ -5,8 +5,8 @@ pub struct TodoDto {
     pub id: uuid::Uuid,
     pub title: String,
     pub content: String,
-    pub completed: bool,
-    pub created_at: chrono::DateTime<chrono::Utc>,
+    pub completed: Option<bool>,
+    pub created_at: Option<chrono::DateTime<chrono::Utc>>,
     pub updated_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
@@ -15,8 +15,8 @@ impl TodoDto {
         id: uuid::Uuid,
         title: String,
         content: String,
-        completed: bool,
-        created_at: chrono::DateTime<chrono::Utc>,
+        completed: Option<bool>,
+        created_at: Option<chrono::DateTime<chrono::Utc>>,
         updated_at: Option<chrono::DateTime<chrono::Utc>>,
     ) -> Self {
         TodoDto {

@@ -1,16 +1,18 @@
-use std::sync::Arc;
-
-use axum::{extract::State, Json};
+use axum::{Json};
 use axum_valid::Valid;
 use serde_json::{json, Value};
 
-use crate::{app_state::AppState, features::todos::{data::todo_repository::TodoRepository, dtos::{upsert_todo_request::UpsertTodoRequest}}};
+use crate::{features::todos::{data::todo_repository::TodoRepository, dtos::{upsert_todo_request::UpsertTodoRequest}}};
 
 pub async fn create_todo(
-    State(state): State<Arc<AppState>>,
     body: Valid<Json<UpsertTodoRequest>>
-) -> Json<Value> {
-    let repo = TodoRepository::new(State(state));
+) -> Result<Json<Value>, (axum::http::StatusCode, Json<Value>)> {
+    let repo = TodoRepository::new();
     let todo = repo.create(&body);
-    return Json(json!(todo));
+
+    if let Some(todo) = todo {
+        return Ok(Json(json!(todo)));
+    }
+
+    return Err((axum::http::StatusCode::INTERNAL_SERVER_ERROR, Json(json!({"error": "Failed to create todo"}))));
 }
