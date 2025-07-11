@@ -1,4 +1,4 @@
-use std::{sync::{Arc, Mutex}};
+use std::{sync::{Arc}};
 use axum::Router;
 use dotenvy::dotenv;
 use todos_app::{app_state::AppState, routes::create_routes};
@@ -23,7 +23,5 @@ async fn main() {
 }
 
 fn initial_state() -> Arc<AppState> {
-    return Arc::new(AppState {
-        todos: Mutex::new(vec![]).into(),
-    })
+    return Arc::new(AppState)
 }
