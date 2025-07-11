@@ -13,7 +13,13 @@ async fn main() {
             .nest("/api", create_routes())
             .with_state(shared_state.clone());
 
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
+    // Use the environment variables for host and port if available
+    let server_url = format!("{}:{}", 
+        std::env::var("SERVER_HOST").unwrap_or_else(|_| "0.0.0.0".to_string()), 
+        std::env::var("SERVER_PORT").unwrap_or_else(|_| "3000".to_string())
+    );
+
+    let listener = tokio::net::TcpListener::bind(server_url)
         .await
         .unwrap();
 
